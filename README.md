@@ -1,4 +1,4 @@
-# Pitch Safe - Pitcher Injury Prevention & Performance Analytics
+# Anthropic AI Hackathon -Pitch Safe- Pitcher Injury Prevention & Performance Analytics
 
 **Empowering baseball pitchers and coaches with data-driven insights to prevent injuries and optimize performance.**
 
