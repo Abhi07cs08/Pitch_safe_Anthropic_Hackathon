@@ -1,6 +1,7 @@
 // frontend/src/App.jsx
 import { useEffect, useState, useMemo } from "react";
 import { configureDependencies } from "./config/dependencies";
+import { apiService } from "./frameworks-drivers/services/apiService";
 
 // Import Views
 import LandingPageView from "./frameworks-drivers/views/LandingPageView";
@@ -15,15 +16,15 @@ function App() {
   const dependencies = useMemo(() => configureDependencies(), []);
   const { 
     authViewModel, 
-    authController, 
-    mlViewModel,
-    mlController 
+    authController
   } = dependencies;
 
   // App state
   const [currentView, setCurrentView] = useState('landing');
   const [authState, setAuthState] = useState(authViewModel.getState());
-  const [mlState, setMlState] = useState(mlViewModel.getState());
+  const [injuryRiskData, setInjuryRiskData] = useState(null);
+  const [mlLoading, setMlLoading] = useState(false);
+  const [mlError, setMlError] = useState(null);
 
   // Subscribe to auth state changes
   useEffect(() => {
@@ -46,49 +47,42 @@ function App() {
     return unsubscribe;
   }, [currentView]);
 
-  // Subscribe to ML state changes
-  useEffect(() => {
-    const unsubscribe = mlViewModel.subscribe((newState) => {
-      console.log('🤖 ML state updated:', newState);
-      console.log('🤖 playerRiskMap:', newState.data?.playerRiskMap);
-      setMlState({ ...newState });
-    });
-
-    return unsubscribe;
-  }, [mlViewModel]);
-
-  // Fetch injury risk data
+  // Fetch injury risk data from backend
   const fetchInjuryRiskData = async () => {
-    console.log('🚀 Starting injury risk data fetch...');
-    console.log('🔍 All env vars:', import.meta.env);
-    console.log('🔍 VITE_CSV_PATH:', import.meta.env.VITE_CSV_PATH);
+    console.log('📊 Starting injury risk data fetch...');
+    setMlLoading(true);
+    setMlError(null);
+
     try {
-      const csvPath = import.meta.env.VITE_CSV_PATH || 
-              '/yankees.csv';
-    } catch (error) {
-      console.error('❌LALALALALLALALALA:', error);
-    }
-    try {
-      const csvPath = import.meta.env.VITE_CSV_PATH || 
-              '/yankees.csv';
+      // IMPORTANT: Update this path to match where your CSV actually is
+      // CSV is at: backend/ml_injury/final_dataset/yankees.csv
+      // Docker path: /app/backend/ml_injury/final_dataset/yankees.csv
+      const csvPath = '/app/backend/ml_injury/final_dataset/yankees.csv';
       
       console.log('📁 CSV Path:', csvPath);
-      console.log('📊 Calling mlController.getInjuryRisk...');
+      console.log('🔗 Calling API endpoint: /api/ml/get-all-predictions');
       
-      await mlController.getInjuryRisk(csvPath, 0.10, '2024-04-01');
+      // Call the NEW backend endpoint
+      const response = await apiService.getMLPredictions(csvPath, 0.10, '2024-04-01');
       
-      console.log('✅ ML Controller call completed');
-      const currentState = mlViewModel.getState();
-      console.log('📦 Full ML State:', currentState);
-      if (currentState.data?.playerRiskMap) {
-        const entries = Object.entries(currentState.data.playerRiskMap);
-        console.log('📊 First 3 players:', entries.slice(0, 3));
+      console.log('✅ API response received:', response);
+      
+      if (response.success && response.predictions) {
+        console.log('✅ ML Predictions loaded successfully');
+        console.log('🎯 Players with predictions:', Object.keys(response.predictions));
+        console.log('📊 Sample prediction:', Object.entries(response.predictions)[0]);
+        setInjuryRiskData(response.predictions);
+      } else {
+        const errorMsg = response.error || 'No predictions available';
+        console.warn('⚠️ Unexpected response:', response);
+        setMlError(errorMsg);
       }
-      console.log('📦 Current mlState after fetch:', mlViewModel.getState());
-      
     } catch (error) {
       console.error('❌ Failed to load injury risk data:', error);
       console.error('Error stack:', error.stack);
+      setMlError(error.message || 'Failed to fetch ML predictions');
+    } finally {
+      setMlLoading(false);
     }
   };
 
@@ -107,6 +101,7 @@ function App() {
     console.log('👋 Logging out...');
     await authController.handleLogout();
     setCurrentView('landing');
+    setInjuryRiskData(null); // Clear data on logout
   };
 
   // Navigation handlers
@@ -149,19 +144,18 @@ function App() {
 
       case 'loggedIn':
         console.log('🎨 Rendering LoggedInUIView');
-        console.log('  mlState:', mlState);
-        console.log('  mlState.data:', mlState.data);
-        console.log('  mlState.data?.playerRiskMap:', mlState.data?.playerRiskMap);
-        console.log('  injuryRiskData:', mlState.data?.playerRiskMap);
+        console.log('  injuryRiskData:', injuryRiskData);
+        console.log('  mlLoading:', mlLoading);
+        console.log('  mlError:', mlError);
         return (
           <LoggedInUIView
             currentUser={authState.currentUser}
             coachId={authState.currentUser?.coach_id}
             onLogout={handleLogout}
             authLoading={authState.isLoading}
-            injuryRiskData={mlState.data?.playerRiskMap}
-            mlLoading={mlState.loading}
-            mlError={mlState.error}
+            injuryRiskData={injuryRiskData}
+            mlLoading={mlLoading}
+            mlError={mlError}
           />
         );
 

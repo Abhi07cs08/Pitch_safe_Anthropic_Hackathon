@@ -31,6 +31,21 @@ class ApiService {
 
     return responseData;
   }
+
+  // for Claude coach analysis
+  async generateCoachAnalysis(playerId, playerName, injuryRiskData) {
+    return this.post('/api/claude/coach-analysis', {
+      playerId,
+      playerName,
+      injuryRiskData,
+    });
+  }
+
+  async getMLPredictions(csvPath, topKRatio = 0.10, startDate = '2024-04-01') {
+    return this.get(
+      `/api/ml/get-all-predictions?csvPath=${encodeURIComponent(csvPath)}&topKRatio=${topKRatio}&startDate=${startDate}`
+    );
+  }
 }
 
 // Create and export a singleton instance
